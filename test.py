@@ -1,70 +1,135 @@
+import pycparser.plyparser
 
-# harmonicCent similarity 1 - 2:  0.999732734153876
-# eigenvectorCent similarity 1 - 2:  0.9841860066035627
-# closenessCent similarity 1 - 2:  0.9999712631204428
-# betweennessCent similarity 1 - 2:  0.9997612100382818
+from ASTParser import ASTParser
+import numpy as np
+import os
+import math
+import random
+from matplotlib import pyplot as plt
+from sklearn import metrics as sk_metrics
 
-code1 = '''void MyFNatoi (const char *str, int *value) {
-    if (value == NULL)
-        return;
-    *value = 0;
-    if (str != NULL) {
-        int negative = 0;
-        if (*str == '-') {
-            negative = 1;
-            str++;
-        }
-        while (*str && isdigit (*str)) {
-            *value = (*value * 10) + (*str++ - '0');
-        }
-        if (negative)
-            *value *= -1;
-    }
-}'''
 
-code2 = '''void MyFNatoi (char *numArray, int *value) {
-    int i;
-    *value = 0;
-    for (i = 0; i < 10 && numArray[i] != 0; i++) {
-        if (numArray[i] >= Zero && numArray[i] <= Nine) {
-            *value = *value * 10 + (numArray[i] - Zero);
-        }
-    }
-}'''
+def getSimilarityGroup():
+    # 自比较
+    path = "ProgramData\\"
+    parser = ASTParser()
+    log = open("log1.txt", "w")
+    fileList = {}
+    sameGroupSim = []
+    differentGroupSim = []
 
-text1 = r"""
-void main() {
-    int x; 
-    foo(1,3);
-    foo1(4);
-    x = 1;
-    foo2(4,10,3);
-    foo3("xxx");
-}
-"""
+    dirList = os.listdir(path)
+    random.shuffle(dirList)
+    dirList = dirList[:20]
 
-text2 = r"""
-void main() {
-    int x, y; 
-    foo(x,y);
-    x = 1;
-    foo2(4,10,3);
-    foo3("xxx");
-}
-"""
+    # same group compare
+    for d in dirList:
+        print("Processing Group %s self comparison" % d)
+        for root, dirs, files in os.walk(os.path.join(path, d)):
+            # 随机选取12个两两比较，计算平均相似度
+            random.shuffle(files)
+            files = files[0:12]
+            sim = []
+            for index, file in enumerate(files[:len(files) - 1]):
+                f = open(os.path.join(root, file), "r", encoding='ISO-8859-1')
+                try:
+                    code = f.read()
+                    v1 = parser.parseCode(code)
+                except pycparser.plyparser.ParseError:
+                    print("Cannot Open File %s" % os.path.join(root, file))
+                    continue
+                f.close()
+                for nextFile in files[index + 1:]:
+                    f = open(os.path.join(root, nextFile), "r", encoding='ISO-8859-1')
+                    try:
+                        code = f.read()
+                        v2 = parser.parseCode(code)
+                    except pycparser.plyparser.ParseError:
+                        print("Cannot Open File %s" % os.path.join(root, nextFile))
+                        continue
+                    com = np.array(parser.compareAll(v1, v2)).mean()  # 取平均
+                    sameGroupSim.append(com)
 
-text3 = r"""
-int max(int x,int y)
-{
-    int t;
-    t = x>y?x:y;
-    return t;
-}
+    # different group
+    for root, dirs, _ in os.walk(path):
+        random.shuffle(dirs)
+        dirs = dirs[:6]
+        for d in dirs:
+            for _, _, files in os.walk(os.path.join(root, d)):
+                random.shuffle(files)
+                files = files[0:10]
+                fileList[d] = files
 
-int main()
-{
-    int maxs;
-    maxs = max(2,3);
-    printf("%d",maxs);
-}
-"""
+    visited = set()
+    for (d1, files1) in fileList.items():
+        for (d2, files2) in fileList.items():
+            print("Processing Group %s - Group %s" % (d1, d2))
+            if (d1, d2) in visited or d1 == d2:
+                continue
+            visited.add((d1, d2))
+            visited.add((d2, d1))
+            sim = []
+            for f1 in files1:
+                for f2 in files2:
+                    f = open(os.path.join(path, d1, f1), "r", encoding='ISO-8859-1')
+                    try:
+                        code = f.read()
+                        v1 = parser.parseCode(code)
+                    except pycparser.plyparser.ParseError:
+                        print("Cannot Open File %s" % os.path.join(path, d1, f1))
+                        continue
+
+                    f = open(os.path.join(path, d2, f2), "r", encoding='ISO-8859-1')
+                    try:
+                        code = f.read()
+                        v2 = parser.parseCode(code)
+                    except pycparser.plyparser.ParseError:
+                        print("Cannot Open File %s" % os.path.join(path, d2, f2))
+                        continue
+                    f.close()
+                    com = np.array(parser.compareAll(v1, v2)).mean()
+                    differentGroupSim.append(com)
+    return sameGroupSim, differentGroupSim
+
+
+def similarity_roc(sameGroupSim, differentGroupSim, show_hist=False, show_roc=False):
+    if show_hist:
+        plt.hist(np.array(sameGroupSim))
+        plt.show()
+        plt.hist(np.array(differentGroupSim))
+        plt.show()
+
+    y = [1] * len(sameGroupSim) + [0] * len(differentGroupSim)
+    score = []
+    score.extend(sameGroupSim)
+    score.extend(differentGroupSim)
+    fpr, tpr, thresholds = sk_metrics.roc_curve(np.array(y), np.array(score))
+    auc_score = sk_metrics.auc(fpr, tpr)
+
+    if show_roc:
+        plt.figure()
+        plt.plot(fpr, tpr)
+        plt.show()
+
+    threshold = 0.0
+    threshold_dis = 0.0
+    threshold_fpr = 0.0
+    threshold_tpr = 0.0
+    for i in range(0, len(fpr)):
+        dis = abs((fpr[i] - tpr[i]) / math.sqrt(2))
+        if dis > threshold_dis:
+            threshold = thresholds[i]
+            threshold_fpr = fpr[i]
+            threshold_tpr = tpr[i]
+            threshold_dis = dis
+
+    return threshold, threshold_tpr, threshold_fpr, auc_score
+
+
+if __name__ == '__main__':
+    sameGroupSim, differentGroupSim = getSimilarityGroup()
+    with open("sim.log", "w") as f:
+        f.writelines(str(sameGroupSim))
+        f.writelines(str(differentGroupSim))
+    res = similarity_roc(sameGroupSim, differentGroupSim, show_roc=True, show_hist=True)
+    print("Threshold = %f,TPR = %f, FPR = %f, AUC=%f" % res)

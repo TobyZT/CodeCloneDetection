@@ -126,7 +126,7 @@ class JavaASTParser(ASTParser):
             return
 
         if hasattr(root, 'children'):
-            print(root.__class__.__name__)
+            # print(root.__class__.__name__)
             for child in root.children:
                 if hasattr(child, 'children'):
                     self.edge_list.append([root.__class__.__name__, child.__class__.__name__])
@@ -140,7 +140,7 @@ class JavaASTParser(ASTParser):
 
     def parseCode(self, code):
         # preprocess:
-        code = re.sub(r'(?<!:)\/\/.*|\/\*(\s|.)*?\*\/', "", code).strip()  # strip comments
+        # code = re.sub(r'(?<!:)\/\/.*|\/\*(\s|.)*?\*\/', "", code).strip()  # strip comments
         code = re.sub(r'^#.+$', "", code, flags=re.M).strip()  # strip macro
 
         tree = javalang.parse.parse(code)

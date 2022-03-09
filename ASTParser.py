@@ -125,23 +125,27 @@ class JavaASTParser(ASTParser):
         if isinstance(root, list) and len(root) == 0:
             return
 
+        # print(root.__class__.__name__)
+
         if hasattr(root, 'children'):
             # print(root.__class__.__name__)
             for child in root.children:
                 if hasattr(child, 'children'):
                     self.edge_list.append([root.__class__.__name__, child.__class__.__name__])
-                self.traverse(child)
+                if child.__class__.__name__ not in ['str', 'NoneType', 'set']:
+                    self.traverse(child)
 
         if isinstance(root, list):
             for child in root:
                 if hasattr(child, 'children'):
                     self.edge_list.append([root.__class__.__name__, child.__class__.__name__])
-                self.traverse(child)
+                if child.__class__.__name__ not in ['str', 'NoneType', 'set']:
+                    self.traverse(child)
 
     def parseCode(self, code):
         # preprocess:
         # code = re.sub(r'(?<!:)\/\/.*|\/\*(\s|.)*?\*\/', "", code).strip()  # strip comments
-        code = re.sub(r'^#.+$', "", code, flags=re.M).strip()  # strip macro
+        # code = re.sub(r'^#.+$', "", code, flags=re.M).strip()  # strip macro
 
         tree = javalang.parse.parse(code)
         self.traverse(tree)
@@ -167,9 +171,22 @@ class JavaASTParser(ASTParser):
 
 
 if __name__ == '__main__':
+    test = '''
+public class Main {
+    public static void main(String[] args) {
+        int a=1;
+        a++;
+        System.out.println(a);
+        System.out.println("===");
+        System.out.println('c');
+        System.out.println(true);
+        return;
+    }
+}'''
     p = JavaASTParser()
     with open("test.java", "r") as f:
         res = p.parseCode(f.read())
+    # res = p.parseCode(test)
     print(res)
     # p = ASTParser()
     # with open("Metrics/test.c", "r", encoding='ISO-8859-1') as f:

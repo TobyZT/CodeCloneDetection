@@ -1,4 +1,5 @@
 import pycparser.plyparser
+from sklearn import preprocessing
 
 from ASTParser import ASTParser
 import numpy as np
@@ -92,7 +93,7 @@ def getSimilarityGroup():
     return sameGroupSim, differentGroupSim
 
 
-def similarity_roc(sameGroupSim, differentGroupSim, show_hist=False, show_roc=False):
+def similarity_roc(sameGroupSim, differentGroupSim, show_hist=False, show_roc=False, title=''):
     if show_hist:
         plt.hist(np.array(sameGroupSim))
         plt.show()

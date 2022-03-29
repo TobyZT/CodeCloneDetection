@@ -102,8 +102,10 @@ class JavaMetricsParser:
 
     def generic_visit(self, node):
         """ Called if no explicit visitor function exists for a
-            node. Implements preorder visiting of the node.
+            node. Implements preorder visiting of the node.compareAll(
         """
+        if type(node) == 'NoneType':
+            return
 
         if isinstance(node, list) and len(node) == 0:
             return
@@ -118,8 +120,11 @@ class JavaMetricsParser:
                 self.LOOP += 1
         elif 'Expression' in node_name or node_name == 'Assignment':
             self.NEXP += 1
-        elif node_name == "MemberReference" and (len(node.postfix_operators) != 0 or len(node.prefix_operators) != 0):
-            self.NEXP += 1
+        elif node_name == "MemberReference":
+            if node.postfix_operators is not None:
+                self.NEXP += len(node.postfix_operators)
+            if node.prefix_operators is not None:
+                self.NEXP += len(node.prefix_operators)
 
         if hasattr(node, 'children'):
             # print(node.__class__.__name__)
@@ -232,7 +237,8 @@ class JavaMetricsParser:
         ]
 
     @staticmethod
-    def similarity(arr1, arr2) -> float:
-        # 存疑： 在实验中，不同组的pearson相关性常<0,是否需要取绝对值？
+    def similarity(arr1, arr2, mean, std) -> float:
+        arr1 = (arr1 - mean) / std
+        arr2 = (arr2 - mean) / std
         correlation = np.corrcoef(arr1, arr2)
         return correlation[0][1]

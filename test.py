@@ -124,7 +124,7 @@ def similarity_roc(sameGroupSim, differentGroupSim, show_hist=False, show_roc=Fa
             threshold_tpr = tpr[i]
             threshold_dis = dis
 
-    return threshold, threshold_tpr, threshold_fpr, auc_score
+    return threshold, tpr, fpr, thresholds
 
 
 if __name__ == '__main__':

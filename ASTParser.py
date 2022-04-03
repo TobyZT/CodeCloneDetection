@@ -1,9 +1,12 @@
-import sys
-import networkx as nx
-from pycparser import c_parser
-import numpy as np
+import os
 import re
+import sys
+
+import clang.cindex
 import javalang
+import networkx as nx
+import numpy as np
+from pycparser import c_parser
 
 sys.path.extend(['.', '..'])
 
@@ -19,8 +22,6 @@ class ASTParser:
                  'Pragma']
     vector = []
     edge_list = []
-    func_list = []
-    var_list = []
 
     def __init__(self):
         self.G = nx.DiGraph()
@@ -48,8 +49,6 @@ class ASTParser:
 
         # clear results of last parsing
         self.edge_list.clear()
-        self.var_list.clear()
-        self.func_list.clear()
         self.G.clear_edges()
         # traver AST
         self.traverse(ast)
@@ -104,6 +103,55 @@ class ASTParser:
         return res
 
 
+class CppASTParser(ASTParser):
+    typeNames = []
+    file_path = ""
+
+    def __init__(self):
+        self.typeNames = [x.name for x in clang.cindex.CursorKind.get_all_kinds() if x is not None]
+        super().__init__()
+        clang.cindex.Config.set_library_file('C:/Program Files/LLVM/bin/libclang.dll')
+        self.index = clang.cindex.Index.create()
+
+    def traverse(self, node):
+        # if node.location.file is not None:
+        #     if node.location.file.name == self.file_path:
+        #         print('Found %s [line=%s, col=%s, kind=%s]' % (
+        #             node.displayname, node.location.line, node.location.column, node.kind.name))
+        for child in node.get_children():
+            if child.location.file is not None:
+                if child.location.file.name == self.file_path:
+                    self.edge_list.append([node.kind.name, child.kind.name])
+            self.traverse(child)
+
+    def parseCode(self, path):
+        tu = self.index.parse(path, args=['-x', 'c++'])
+        root = tu.cursor
+        self.file_path = root.displayname
+
+        self.edge_list.clear()
+        self.G.clear_edges()
+        self.traverse(root)
+
+        for [u, v] in self.edge_list:
+            if self.G.has_edge(u, v):
+                self.G[u][v]['weight'] += 1
+            else:
+                self.G.add_edge(u, v, weight=1)
+
+        # calculate featured vector
+        res = {}
+        res['harmonicCent'] = [cent / len(self.G) if cent > 1e-5 else 0 for cent in
+                               nx.harmonic_centrality(self.G).values()]
+        # res['eigenvectorCent'] = [cent if cent > 1e-5 else 0 for cent in nx.eigenvector_centrality(self.G).values()]
+        res['degreeCent'] = [cent if cent > 1e-5 else 0 for cent in nx.degree_centrality(self.G).values()]
+        res['closenessCent'] = [cent if cent > 1e-5 else 0 for cent in nx.closeness_centrality(self.G).values()]
+        res['betweennessCent'] = [cent if cent > 1e-5 else 0 for cent in nx.betweenness_centrality(self.G).values()]
+
+        # self.vector = [cent if cent > 1e-5 else 0 for cent in v.values()]
+        return res
+
+
 class JavaASTParser(ASTParser):
     typeNames = ["CompilationUnit", "Import", "Documented", "Declaration", "TypeDeclaration", "PackageDeclaration",
                  "ClassDeclaration", "EnumDeclaration", "InterfaceDeclaration", "AnnotationDeclaration", "Type",
@@ -147,6 +195,9 @@ class JavaASTParser(ASTParser):
         # code = re.sub(r'(?<!:)\/\/.*|\/\*(\s|.)*?\*\/', "", code).strip()  # strip comments
         # code = re.sub(r'^#.+$', "", code, flags=re.M).strip()  # strip macro
 
+        self.edge_list.clear()
+        self.G.clear_edges()
+
         tree = javalang.parse.parse(code)
         self.traverse(tree)
 
@@ -171,24 +222,6 @@ class JavaASTParser(ASTParser):
 
 
 if __name__ == '__main__':
-    test = '''
-public class Main {
-    public static void main(String[] args) {
-        int a=1;
-        a++;
-        System.out.println(a);
-        System.out.println("===");
-        System.out.println('c');
-        System.out.println(true);
-        return;
-    }
-}'''
-    p = JavaASTParser()
-    with open("test.java", "r") as f:
-        res = p.parseCode(f.read())
-    # res = p.parseCode(test)
-    print(res)
-    # p = ASTParser()
-    # with open("Metrics/test.c", "r", encoding='ISO-8859-1') as f:
-    #     res = p.parseCode(f.read())
-    # print(res)
+    cwd_dir = os.getcwd()
+    p = CppASTParser()
+    p.parseCode(os.path.join(cwd_dir, "ProgramData", "1", "13.txt"))

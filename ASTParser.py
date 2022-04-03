@@ -36,12 +36,14 @@ class ASTParser:
         if len(root.children()) == 0:
             return
         for (_, child) in root.children():
-            self.edge_list.append([root.__class__.__name__, child.__class__.__name__])
+            self.edge_list.append(
+                [root.__class__.__name__, child.__class__.__name__])
             self.traverse(child)
 
     def parseCode(self, code):
         # preprocess:
-        code = re.sub(r'(?<!:)\/\/.*|\/\*(\s|.)*?\*\/', "", code).strip()  # strip comments
+        code = re.sub(r'(?<!:)\/\/.*|\/\*(\s|.)*?\*\/',
+                      "", code).strip()  # strip comments
         code = re.sub(r'^#.+$', "", code, flags=re.M).strip()  # strip macro
 
         parser = c_parser.CParser()
@@ -65,33 +67,30 @@ class ASTParser:
         res['harmonicCent'] = [cent / len(self.G) if cent > 1e-5 else 0 for cent in
                                nx.harmonic_centrality(self.G).values()]
         # res['eigenvectorCent'] = [cent if cent > 1e-5 else 0 for cent in nx.eigenvector_centrality(self.G).values()]
-        res['degreeCent'] = [cent if cent > 1e-5 else 0 for cent in nx.degree_centrality(self.G).values()]
-        res['closenessCent'] = [cent if cent > 1e-5 else 0 for cent in nx.closeness_centrality(self.G).values()]
-        res['betweennessCent'] = [cent if cent > 1e-5 else 0 for cent in nx.betweenness_centrality(self.G).values()]
+        res['degreeCent'] = [cent if cent >
+                             1e-5 else 0 for cent in nx.degree_centrality(self.G).values()]
+        res['closenessCent'] = [cent if cent >
+                                1e-5 else 0 for cent in nx.closeness_centrality(self.G).values()]
+        res['betweennessCent'] = [cent if cent >
+                                  1e-5 else 0 for cent in nx.betweenness_centrality(self.G).values()]
 
         # self.vector = [cent if cent > 1e-5 else 0 for cent in v.values()]
         return res
 
     @staticmethod
     def compare(vec1, vec2):
-        v1 = np.array(vec1)
-        v2 = np.array(vec2)
-        # 计算相关系数
-        correlation = np.corrcoef(v1, v2)
-        return correlation[0][1]
-        # # 计算向量的cosine距离
-        # num = float(np.dot(v1, v2))  # 向量点乘
-        # denom = np.linalg.norm(v1) * np.linalg.norm(v2)  # 求模长的乘积
-        # return 0.5 + 0.5 * (num / denom) if denom != 0 else 0
-
-    @staticmethod
-    def compareAll(vec1, vec2):
         # column: cosine correlation
         res = []
         for (key, value) in vec1.items():
             row = []
             v1 = np.array(value)
             v2 = np.array(vec2[key])
+            if np.all(v1 == v2):
+                res.append([1, 1])
+                continue
+            if np.all(v1 == 0) or np.all(v2 == 0):
+                res.append([0, 0])
+                continue
             # 计算向量的cosine距离
             num = float(np.dot(v1, v2))  # 向量点乘
             denom = np.linalg.norm(v1) * np.linalg.norm(v2)  # 求模长的乘积
@@ -108,9 +107,10 @@ class CppASTParser(ASTParser):
     file_path = ""
 
     def __init__(self):
-        self.typeNames = [x.name for x in clang.cindex.CursorKind.get_all_kinds() if x is not None]
+        self.typeNames = [
+            x.name for x in clang.cindex.CursorKind.get_all_kinds() if x is not None]
         super().__init__()
-        clang.cindex.Config.set_library_file('C:/Program Files/LLVM/bin/libclang.dll')
+        # clang.cindex.Config.set_library_file(clang_path)
         self.index = clang.cindex.Index.create()
 
     def traverse(self, node):
@@ -144,9 +144,12 @@ class CppASTParser(ASTParser):
         res['harmonicCent'] = [cent / len(self.G) if cent > 1e-5 else 0 for cent in
                                nx.harmonic_centrality(self.G).values()]
         # res['eigenvectorCent'] = [cent if cent > 1e-5 else 0 for cent in nx.eigenvector_centrality(self.G).values()]
-        res['degreeCent'] = [cent if cent > 1e-5 else 0 for cent in nx.degree_centrality(self.G).values()]
-        res['closenessCent'] = [cent if cent > 1e-5 else 0 for cent in nx.closeness_centrality(self.G).values()]
-        res['betweennessCent'] = [cent if cent > 1e-5 else 0 for cent in nx.betweenness_centrality(self.G).values()]
+        res['degreeCent'] = [cent if cent >
+                             1e-5 else 0 for cent in nx.degree_centrality(self.G).values()]
+        res['closenessCent'] = [cent if cent >
+                                1e-5 else 0 for cent in nx.closeness_centrality(self.G).values()]
+        res['betweennessCent'] = [cent if cent >
+                                  1e-5 else 0 for cent in nx.betweenness_centrality(self.G).values()]
 
         # self.vector = [cent if cent > 1e-5 else 0 for cent in v.values()]
         return res
@@ -179,14 +182,16 @@ class JavaASTParser(ASTParser):
             # print(root.__class__.__name__)
             for child in root.children:
                 if hasattr(child, 'children'):
-                    self.edge_list.append([root.__class__.__name__, child.__class__.__name__])
+                    self.edge_list.append(
+                        [root.__class__.__name__, child.__class__.__name__])
                 if child.__class__.__name__ not in ['str', 'NoneType', 'set']:
                     self.traverse(child)
 
         if isinstance(root, list):
             for child in root:
                 if hasattr(child, 'children'):
-                    self.edge_list.append([root.__class__.__name__, child.__class__.__name__])
+                    self.edge_list.append(
+                        [root.__class__.__name__, child.__class__.__name__])
                 if child.__class__.__name__ not in ['str', 'NoneType', 'set']:
                     self.traverse(child)
 
@@ -213,15 +218,12 @@ class JavaASTParser(ASTParser):
         res['harmonicCent'] = [cent / len(self.G) if cent > 1e-5 else 0 for cent in
                                nx.harmonic_centrality(self.G).values()]
         # res['eigenvectorCent'] = [cent if cent > 1e-5 else 0 for cent in nx.eigenvector_centrality(self.G).values()]
-        res['degreeCent'] = [cent if cent > 1e-5 else 0 for cent in nx.degree_centrality(self.G).values()]
-        res['closenessCent'] = [cent if cent > 1e-5 else 0 for cent in nx.closeness_centrality(self.G).values()]
-        res['betweennessCent'] = [cent if cent > 1e-5 else 0 for cent in nx.betweenness_centrality(self.G).values()]
+        res['degreeCent'] = [cent if cent >
+                             1e-5 else 0 for cent in nx.degree_centrality(self.G).values()]
+        res['closenessCent'] = [cent if cent >
+                                1e-5 else 0 for cent in nx.closeness_centrality(self.G).values()]
+        res['betweennessCent'] = [cent if cent >
+                                  1e-5 else 0 for cent in nx.betweenness_centrality(self.G).values()]
 
         # self.vector = [cent if cent > 1e-5 else 0 for cent in v.values()]
         return res
-
-
-if __name__ == '__main__':
-    cwd_dir = os.getcwd()
-    p = CppASTParser()
-    p.parseCode(os.path.join(cwd_dir, "ProgramData", "1", "13.txt"))
